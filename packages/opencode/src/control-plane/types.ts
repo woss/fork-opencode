@@ -1,8 +1,7 @@
 import { Schema } from "effect"
 import { ProjectID } from "@/project/schema"
 import { WorkspaceID } from "./schema"
-import { zod } from "@/util/effect-zod"
-import { type DeepMutable, withStatics } from "@/util/schema"
+import type { DeepMutable } from "@/util/schema"
 
 export const WorkspaceInfo = Schema.Struct({
   id: WorkspaceID,
@@ -12,16 +11,14 @@ export const WorkspaceInfo = Schema.Struct({
   directory: Schema.NullOr(Schema.String),
   extra: Schema.NullOr(Schema.Unknown),
   projectID: ProjectID,
-})
-  .annotate({ identifier: "Workspace" })
-  .pipe(withStatics((s) => ({ zod: zod(s) })))
+}).annotate({ identifier: "Workspace" })
 export type WorkspaceInfo = DeepMutable<Schema.Schema.Type<typeof WorkspaceInfo>>
 
 export const WorkspaceAdapterEntry = Schema.Struct({
   type: Schema.String,
   name: Schema.String,
   description: Schema.String,
-}).pipe(withStatics((s) => ({ zod: zod(s) })))
+})
 export type WorkspaceAdapterEntry = Schema.Schema.Type<typeof WorkspaceAdapterEntry>
 
 export type Target =

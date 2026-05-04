@@ -29,8 +29,7 @@ import { errorData } from "@/util/error"
 import { waitEvent } from "./util"
 import { WorkspaceContext } from "./workspace-context"
 import { EffectBridge } from "@/effect/bridge"
-import { withStatics } from "@/util/schema"
-import { zod as effectZod, zodObject } from "@/util/effect-zod"
+import { NonNegativeInt } from "@/util/schema"
 
 export const Info = WorkspaceInfoSchema
 export type Info = WorkspaceInfo
@@ -80,13 +79,13 @@ export const CreateInput = Schema.Struct({
   branch: Info.fields.branch,
   projectID: ProjectID,
   extra: Schema.optional(Info.fields.extra),
-}).pipe(withStatics((s) => ({ zod: effectZod(s), zodObject: zodObject(s) })))
+})
 export type CreateInput = Schema.Schema.Type<typeof CreateInput>
 
 export const SessionWarpInput = Schema.Struct({
   workspaceID: Schema.NullOr(WorkspaceID),
   sessionID: SessionID,
-}).pipe(withStatics((s) => ({ zod: effectZod(s), zodObject: zodObject(s) })))
+})
 export type SessionWarpInput = Schema.Schema.Type<typeof SessionWarpInput>
 
 export class SyncHttpError extends Schema.TaggedErrorClass<SyncHttpError>()("WorkspaceSyncHttpError", {

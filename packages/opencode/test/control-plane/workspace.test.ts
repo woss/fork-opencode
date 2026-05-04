@@ -4,7 +4,7 @@ import Http from "node:http"
 import path from "node:path"
 import { setTimeout as delay } from "node:timers/promises"
 import { NodeHttpServer } from "@effect/platform-node"
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Schema } from "effect"
 import { HttpServer, HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { eq } from "drizzle-orm"
 import * as Log from "@opencode-ai/core/util/log"
@@ -346,9 +346,10 @@ describe("workspace-old schemas and exports", () => {
       extra: { nested: true },
     }
 
-    expect(WorkspaceOld.CreateInput.zod.parse(input)).toEqual(input)
-    expect(() => WorkspaceOld.CreateInput.zod.parse({ ...input, id: "bad" })).toThrow()
-    expect(() => WorkspaceOld.CreateInput.zod.parse({ ...input, branch: 1 })).toThrow()
+    const decode = Schema.decodeUnknownSync(WorkspaceOld.CreateInput)
+    expect(decode(input)).toEqual(input)
+    expect(() => decode({ ...input, id: 1 })).toThrow()
+    expect(() => decode({ ...input, branch: 1 })).toThrow()
   })
 })
 
