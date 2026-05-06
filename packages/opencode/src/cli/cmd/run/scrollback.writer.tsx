@@ -1,7 +1,7 @@
 /** @jsxImportSource @opentui/solid */
 
 import { createScrollbackWriter } from "@opentui/solid"
-import { TextRenderable, type ColorInput, type ScrollbackWriter } from "@opentui/core"
+import { TextRenderable, type ColorInput, type ScrollbackRenderContext, type ScrollbackWriter } from "@opentui/core"
 import { Match, Switch, createMemo } from "solid-js"
 import { entryBody, entryFlags } from "./entry.body"
 import { entryColor, entryLook, entrySyntax } from "./scrollback.shared"
@@ -326,7 +326,7 @@ export function entryWriter(input: {
 }
 
 export function spacerWriter(): ScrollbackWriter {
-  return (ctx) => ({
+  return (ctx: ScrollbackRenderContext) => ({
     root: new TextRenderable(ctx.renderContext, {
       id: "run-scrollback-spacer",
       width: Math.max(1, Math.trunc(ctx.width)),

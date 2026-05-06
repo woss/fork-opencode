@@ -576,6 +576,7 @@ function failTool(state: State, ref: Ref, error: string): void {
 
 function emitError(state: State, text: string): void {
   const event = {
+    id: `session.error:${state.id}:${Date.now()}`,
     type: "session.error",
     properties: {
       sessionID: state.id,
@@ -1230,6 +1231,7 @@ export function createRunDemo(input: Input) {
 
     state.perms.delete(input.requestID)
     const event = {
+      id: `permission.replied:${input.requestID}:${Date.now()}`,
       type: "permission.replied",
       properties: {
         sessionID: state.id,
@@ -1256,6 +1258,7 @@ export function createRunDemo(input: Input) {
 
     state.asks.delete(input.requestID)
     const event = {
+      id: `question.replied:${input.requestID}:${Date.now()}`,
       type: "question.replied",
       properties: {
         sessionID: state.id,

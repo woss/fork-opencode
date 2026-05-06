@@ -953,7 +953,7 @@ export function createPromptState(input: PromptInput): PromptState {
     const end =
       typeof area.height === "number" && Number.isFinite(area.height) && area.height > 0
         ? area.height - 1
-        : Math.max(0, area.virtualLineCount - 1)
+        : Math.max(0, (area.virtualLineCount ?? 1) - 1)
     if (dir === 1 && area.visualCursor.visualRow === end) {
       area.cursorOffset = area.plainText.length
     }
