@@ -177,7 +177,7 @@ async function runInteractiveRuntime(input: RunRuntimeInput): Promise<void> {
       const keybindTask = resolveFooterKeybinds()
       const diffTask = resolveDiffStyle()
       const ctx = await input.boot()
-      const modelTask = resolveModelInfo(ctx.sdk, ctx.model)
+      const modelTask = resolveModelInfo(ctx.sdk, ctx.directory, ctx.model)
       const sessionTask =
         ctx.resume === true
           ? resolveSessionInfo(ctx.sdk, ctx.sessionID, ctx.model)
@@ -291,7 +291,7 @@ async function runInteractiveRuntime(input: RunRuntimeInput): Promise<void> {
           })
           return {
             status: state.activeVariant ? `variant ${state.activeVariant}` : "variant default",
-            modelLabel: formatModelLabel(state.model, state.activeVariant),
+            modelLabel: formatModelLabel(state.model, state.activeVariant, state.providers),
           }
         },
         onModelSelect: async (model) => {
@@ -327,7 +327,7 @@ async function runInteractiveRuntime(input: RunRuntimeInput): Promise<void> {
             "opencode.model.variant": state.activeVariant,
           })
           return {
-            modelLabel: formatModelLabel(model, state.activeVariant),
+            modelLabel: formatModelLabel(model, state.activeVariant, state.providers),
             status: `model ${model.modelID}`,
           }
         },
@@ -439,7 +439,7 @@ async function runInteractiveRuntime(input: RunRuntimeInput): Promise<void> {
 
         footer.event({
           type: "model",
-          model: formatModelLabel(state.model, state.activeVariant),
+          model: formatModelLabel(state.model, state.activeVariant, state.providers),
         })
       })
 

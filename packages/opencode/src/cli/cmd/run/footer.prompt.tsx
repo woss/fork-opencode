@@ -76,6 +76,7 @@ type PromptInput = {
   onSubmit: (input: RunPrompt) => boolean | Promise<boolean>
   onCycle: () => void
   onInterrupt: () => boolean
+  onInputClear: () => void
   onExitRequest?: () => boolean
   onExit: () => void
   onRows: (rows: number) => void
@@ -90,6 +91,7 @@ export type PromptState = {
   selected: Accessor<number>
   offset: Accessor<number>
   rows: Accessor<number>
+  requestExit: () => boolean
   onSubmit: () => void
   onKeyDown: (event: KeyEvent) => void
   onContentChange: () => void
@@ -549,6 +551,22 @@ export function createPromptState(input: PromptInput): PromptState {
     area.focus()
   }
 
+  const resetDraft = () => {
+    if (area && !area.isDestroyed) {
+      area.setText("")
+    }
+
+    clearParts()
+    hide()
+    draft = { text: "", parts: [] }
+    if (!area || area.isDestroyed) {
+      return
+    }
+
+    scheduleRows()
+    area.focus()
+  }
+
   const replaceDraft = (text: string) => {
     draft = { text, parts: [] }
     if (!area || area.isDestroyed) {
@@ -708,6 +726,17 @@ export function createPromptState(input: PromptInput): PromptState {
     return true
   }
 
+  const requestExit = () => {
+    const text = area && !area.isDestroyed ? area.plainText : draft.text
+    if (input.prompt() && text.length > 0) {
+      input.onInputClear()
+      resetDraft()
+      return true
+    }
+
+    return input.onExitRequest ? input.onExitRequest() : (input.onExit(), true)
+  }
+
   const cancelAutocomplete = () => {
     if (!area || area.isDestroyed) {
       return
@@ -827,6 +856,7 @@ export function createPromptState(input: PromptInput): PromptState {
   }
 
   const onKeyDown = (event: KeyEvent) => {
+    const key = promptInfo(event)
     if (visible()) {
       const name = event.name.toLowerCase()
       const ctrl = event.ctrl && !event.meta && !event.shift
@@ -881,15 +911,14 @@ export function createPromptState(input: PromptInput): PromptState {
       }
     }
 
-    if (event.ctrl && event.name === "c") {
-      const handled = input.onExitRequest ? input.onExitRequest() : (input.onExit(), true)
+    if (promptHit(keys().clear, key)) {
+      const handled = requestExit()
       if (handled) {
         event.preventDefault()
       }
       return
     }
 
-    const key = promptInfo(event)
     if (promptHit(keys().interrupts, key)) {
       if (input.onInterrupt()) {
         event.preventDefault()
@@ -939,8 +968,8 @@ export function createPromptState(input: PromptInput): PromptState {
       return
     }
 
-    if (event.ctrl && event.name === "c") {
-      const handled = input.onExitRequest ? input.onExitRequest() : (input.onExit(), true)
+    if (promptHit(keys().clear, promptInfo(event))) {
+      const handled = requestExit()
       if (handled) {
         event.preventDefault()
       }
@@ -981,12 +1010,7 @@ export function createPromptState(input: PromptInput): PromptState {
 
     const submit = parsed?.type === "command" ? { ...next, command: parsed.command } : next
 
-    area.setText("")
-    clearParts()
-    hide()
-    draft = { text: "", parts: [] }
-    scheduleRows()
-    area.focus()
+    resetDraft()
     queueMicrotask(async () => {
       if (await input.onSubmit(submit)) {
         push(next)
@@ -1062,6 +1086,7 @@ export function createPromptState(input: PromptInput): PromptState {
     selected: menu.selected,
     offset: menu.offset,
     rows: menu.rows,
+    requestExit,
     onSubmit,
     onKeyDown,
     onContentChange: () => {

@@ -262,6 +262,7 @@ export type FooterKeybinds = {
   interrupt: string
   historyPrevious: string
   historyNext: string
+  inputClear: string
   inputSubmit: string
   inputNewline: string
 }

@@ -6,6 +6,7 @@ import {
   movePromptHistory,
   printableBinding,
   promptCycle,
+  promptHit,
   promptInfo,
   promptKeys,
   pushPromptHistory,
@@ -19,6 +20,7 @@ const keybinds: FooterKeybinds = {
   interrupt: "escape",
   historyPrevious: "up",
   historyNext: "down",
+  inputClear: "ctrl+c",
   inputSubmit: "return",
   inputNewline: "shift+return,ctrl+return,alt+return,ctrl+j",
 }
@@ -80,6 +82,8 @@ describe("run prompt shared", () => {
 
   test("handles direct and leader-based variant cycling", () => {
     const keys = promptKeys(keybinds)
+
+    expect(promptHit(keys.clear, promptInfo({ name: "c", ctrl: true }))).toBe(true)
 
     expect(promptCycle(false, promptInfo({ name: "x", ctrl: true }), keys.leaders, keys.cycles)).toEqual({
       arm: true,

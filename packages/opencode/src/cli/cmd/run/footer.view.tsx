@@ -11,7 +11,7 @@
 // The view itself is stateless except for derived memos.
 /** @jsxImportSource @opentui/solid */
 import { useKeyboard, useTerminalDimensions } from "@opentui/solid"
-import { Match, Show, Switch, createEffect, createMemo, createSignal } from "solid-js"
+import { Match, Show, Switch, createEffect, createMemo, createSignal, onCleanup } from "solid-js"
 import "opentui-spinner/solid"
 import { createColors, createFrames } from "../tui/ui/spinner"
 import * as Keybind from "@/util/keybind"
@@ -77,7 +77,9 @@ type RunFooterViewProps = {
   onQuestionReject: (input: QuestionReject) => void | Promise<void>
   onCycle: () => void
   onInterrupt: () => boolean
+  onInputClear: () => void
   onExitRequest?: () => boolean
+  onRequestExit?: (fn: (() => boolean) | undefined) => void
   onExit: () => void
   onModelSelect: (model: NonNullable<RunInput["model"]>) => void
   onRows: (rows: number) => void
@@ -249,12 +251,21 @@ export function RunFooterView(props: RunFooterViewProps) {
     onSubmit: props.onSubmit,
     onCycle: props.onCycle,
     onInterrupt: props.onInterrupt,
+    onInputClear: props.onInputClear,
     onExitRequest: props.onExitRequest,
     onExit: props.onExit,
     onRows: props.onRows,
     onStatus: props.onStatus,
   })
   const menu = createMemo(() => prompt() && composer.visible())
+
+  createEffect(() => {
+    props.onRequestExit?.(composer.requestExit)
+  })
+
+  onCleanup(() => {
+    props.onRequestExit?.(undefined)
+  })
 
   useKeyboard((event) => {
     if (event.defaultPrevented) {

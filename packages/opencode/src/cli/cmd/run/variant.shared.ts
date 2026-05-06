@@ -13,7 +13,7 @@ import { makeRuntime } from "@/effect/run-service"
 import { Global } from "@opencode-ai/core/global"
 import { isRecord } from "@/util/record"
 import { createSession, sessionVariant, type RunSession, type SessionMessages } from "./session.shared"
-import type { RunInput } from "./types"
+import type { RunInput, RunProvider } from "./types"
 
 const MODEL_FILE = path.join(Global.Path.state, "model.json")
 
@@ -39,9 +39,22 @@ function variantKey(model: NonNullable<RunInput["model"]>): string {
   return modelKey(model.providerID, model.modelID)
 }
 
-export function formatModelLabel(model: NonNullable<RunInput["model"]>, variant: string | undefined): string {
+function modelInfo(providers: RunProvider[] | undefined, model: NonNullable<RunInput["model"]>) {
+  const provider = providers?.find((item) => item.id === model.providerID)
+  return {
+    provider: provider?.name ?? model.providerID,
+    model: provider?.models[model.modelID]?.name ?? model.modelID,
+  }
+}
+
+export function formatModelLabel(
+  model: NonNullable<RunInput["model"]>,
+  variant: string | undefined,
+  providers?: RunProvider[],
+): string {
+  const names = modelInfo(providers, model)
   const label = variant ? ` · ${variant}` : ""
-  return `${model.modelID} · ${model.providerID}${label}`
+  return `${names.model} · ${names.provider}${label}`
 }
 
 export function cycleVariant(current: string | undefined, variants: string[]): string | undefined {

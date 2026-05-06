@@ -72,6 +72,7 @@ describe("run runtime boot", () => {
         command_list: " ctrl+p ",
         history_previous: " k ",
         history_next: " j ",
+        input_clear: " ctrl+l ",
         input_submit: " ctrl+s ",
         input_newline: " alt+return ",
       },
@@ -84,6 +85,7 @@ describe("run runtime boot", () => {
       interrupt: "ctrl+c",
       historyPrevious: "k",
       historyNext: "j",
+      inputClear: "ctrl+l",
       inputSubmit: "ctrl+s",
       inputNewline: "alt+return",
     })
@@ -99,12 +101,13 @@ describe("run runtime boot", () => {
       interrupt: "escape",
       historyPrevious: "up",
       historyNext: "down",
+      inputClear: "ctrl+c",
       inputSubmit: "return",
       inputNewline: "shift+return,ctrl+return,alt+return,ctrl+j",
     })
   })
 
-  test("collects model variants and context limits", async () => {
+  test("prefers configured providers for model selector data", async () => {
     const sdk = new OpencodeClient()
     const data: {
       all: Provider[]
@@ -139,6 +142,80 @@ describe("run runtime boot", () => {
       default: {},
       connected: [],
     }
+    const configured = {
+      providers: [data.all[0]!],
+      default: {},
+    }
+    const list = spyOn(sdk.provider, "list").mockImplementation(() =>
+      Promise.resolve({
+        data,
+        error: undefined,
+        request: new Request("https://opencode.test"),
+        response: new Response(),
+      }),
+    )
+    spyOn(sdk.config, "providers").mockImplementation(() =>
+      Promise.resolve({
+        data: configured,
+        error: undefined,
+        request: new Request("https://opencode.test"),
+        response: new Response(),
+      }),
+    )
+
+    await expect(resolveModelInfo(sdk, "/workspace", { providerID: "openai", modelID: "gpt-5" })).resolves.toEqual({
+      providers: configured.providers,
+      variants: ["high", "minimal"],
+      limits: {
+        "openai/gpt-5": 128000,
+      },
+    })
+    expect(list).not.toHaveBeenCalled()
+  })
+
+  test("falls back to provider list when configured providers are unavailable", async () => {
+    const sdk = new OpencodeClient()
+    const data: {
+      all: Provider[]
+      default: Record<string, string>
+      connected: string[]
+    } = {
+      all: [
+        {
+          id: "openai",
+          name: "OpenAI",
+          source: "api",
+          env: [],
+          options: {},
+          models: {
+            "gpt-5": model("gpt-5", "openai", 128000, {
+              high: {},
+              minimal: {},
+            }),
+          },
+        },
+        {
+          id: "anthropic",
+          name: "Anthropic",
+          source: "api",
+          env: [],
+          options: {},
+          models: {
+            sonnet: model("sonnet", "anthropic", 200000),
+          },
+        },
+      ],
+      default: {},
+      connected: [],
+    }
+    spyOn(sdk.config, "providers").mockImplementation(() =>
+      Promise.resolve({
+        data: undefined,
+        error: undefined,
+        request: new Request("https://opencode.test"),
+        response: new Response(),
+      }),
+    )
     spyOn(sdk.provider, "list").mockImplementation(() =>
       Promise.resolve({
         data,
@@ -148,7 +225,7 @@ describe("run runtime boot", () => {
       }),
     )
 
-    await expect(resolveModelInfo(sdk, { providerID: "openai", modelID: "gpt-5" })).resolves.toEqual({
+    await expect(resolveModelInfo(sdk, "/workspace", { providerID: "openai", modelID: "gpt-5" })).resolves.toEqual({
       providers: data.all,
       variants: ["high", "minimal"],
       limits: {

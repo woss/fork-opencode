@@ -20,6 +20,7 @@ const DEFAULT_KEYBINDS: FooterKeybinds = {
   interrupt: "escape",
   historyPrevious: "up",
   historyNext: "down",
+  inputClear: "ctrl+c",
   inputSubmit: "return",
   inputNewline: "shift+return,ctrl+return,alt+return,ctrl+j",
 }
@@ -38,7 +39,11 @@ export type SessionInfo = {
 
 type Config = Awaited<ReturnType<typeof TuiConfig.get>>
 type BootService = {
-  readonly resolveModelInfo: (sdk: RunInput["sdk"], model: RunInput["model"]) => Effect.Effect<ModelInfo>
+  readonly resolveModelInfo: (
+    sdk: RunInput["sdk"],
+    directory: string,
+    model: RunInput["model"],
+  ) => Effect.Effect<ModelInfo>
   readonly resolveSessionInfo: (
     sdk: RunInput["sdk"],
     sessionID: string,
@@ -79,6 +84,7 @@ function footerKeybinds(config: Config | undefined): FooterKeybinds {
   const interrupt = config?.keybinds?.session_interrupt?.trim() || DEFAULT_KEYBINDS.interrupt
   const previous = config?.keybinds?.history_previous?.trim() || DEFAULT_KEYBINDS.historyPrevious
   const next = config?.keybinds?.history_next?.trim() || DEFAULT_KEYBINDS.historyNext
+  const clear = config?.keybinds?.input_clear?.trim() || DEFAULT_KEYBINDS.inputClear
   const submit = config?.keybinds?.input_submit?.trim() || DEFAULT_KEYBINDS.inputSubmit
   const newline = config?.keybinds?.input_newline?.trim() || DEFAULT_KEYBINDS.inputNewline
 
@@ -98,6 +104,7 @@ function footerKeybinds(config: Config | undefined): FooterKeybinds {
     interrupt,
     historyPrevious: previous,
     historyNext: next,
+    inputClear: clear,
     inputSubmit: submit,
     inputNewline: newline,
   }
@@ -107,16 +114,31 @@ const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const config = Effect.fn("RunBoot.config")(() =>
-      Effect.promise(loadConfig).pipe(
-        Effect.orElseSucceed(() => undefined),
-      ),
+      Effect.tryPromise({
+        try: loadConfig,
+        catch: () => undefined,
+      }),
     )
 
-    const resolveModelInfo = Effect.fn("RunBoot.resolveModelInfo")(function* (sdk: RunInput["sdk"], model: RunInput["model"]) {
-      const providers = yield* Effect.promise(() => sdk.provider.list()).pipe(
-        Effect.map((item) => item.data?.all ?? []),
-        Effect.orElseSucceed(() => []),
+    const resolveModelInfo = Effect.fn("RunBoot.resolveModelInfo")(function* (
+      sdk: RunInput["sdk"],
+      directory: string,
+      model: RunInput["model"],
+    ) {
+      const connected = yield* Effect.tryPromise({
+        try: () => sdk.config.providers({ directory }),
+        catch: () => undefined,
+      }).pipe(
+        Effect.map((item) => item?.data?.providers),
       )
+      const providers = yield* (connected
+        ? Effect.succeed(connected)
+        : Effect.tryPromise({
+            try: () => sdk.provider.list(),
+            catch: () => undefined,
+          }).pipe(
+            Effect.map((item) => item?.data?.all ?? []),
+          ))
       const limits = Object.fromEntries(
         providers.flatMap((provider) =>
           Object.entries(provider.models ?? {}).flatMap(([modelID, info]) => {
@@ -151,9 +173,10 @@ const layer = Layer.effect(
       sessionID: string,
       model: RunInput["model"],
     ) {
-      const session = yield* Effect.promise(() => resolveSession(sdk, sessionID)).pipe(
-        Effect.orElseSucceed(() => undefined),
-      )
+      const session = yield* Effect.tryPromise({
+        try: () => resolveSession(sdk, sessionID),
+        catch: () => undefined,
+      })
       if (!session) {
         return emptySessionInfo()
       }
@@ -185,8 +208,12 @@ const layer = Layer.effect(
 const runtime = makeRuntime(Service, layer)
 
 // Fetches available variants and context limits for every provider/model pair.
-export async function resolveModelInfo(sdk: RunInput["sdk"], model: RunInput["model"]): Promise<ModelInfo> {
-  return runtime.runPromise((svc) => svc.resolveModelInfo(sdk, model)).catch(() => emptyModelInfo())
+export async function resolveModelInfo(
+  sdk: RunInput["sdk"],
+  directory: string,
+  model: RunInput["model"],
+): Promise<ModelInfo> {
+  return runtime.runPromise((svc) => svc.resolveModelInfo(sdk, directory, model)).catch(() => emptyModelInfo())
 }
 
 // Fetches session messages to determine if this is the first turn and build prompt history.

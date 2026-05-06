@@ -21,8 +21,9 @@
 //   - The renderer's DESTROY event triggers destroy() so the footer
 //     doesn't outlive the renderer.
 //
-// Interrupt and exit use a two-press pattern: first press shows a hint,
-// second press within 5 seconds actually fires the action.
+// Ctrl-c clears a live prompt draft first; otherwise interrupt and exit use a
+// two-press pattern where the first press shows a hint and the second press
+// within 5 seconds actually fires the action.
 import { CliRenderEvents, type CliRenderer, type TreeSitterClient } from "@opentui/core"
 import { render } from "@opentui/solid"
 import { createComponent, createSignal, type Accessor, type Setter } from "solid-js"
@@ -185,6 +186,7 @@ export class RunFooter implements FooterApi {
   private interruptTimeout: NodeJS.Timeout | undefined
   private exitTimeout: NodeJS.Timeout | undefined
   private interruptHint: string
+  private requestExitHandler: (() => boolean) | undefined
   private scrollback: RunScrollbackStream
 
   constructor(
@@ -265,7 +267,9 @@ export class RunFooter implements FooterApi {
           onQuestionReject: this.handleQuestionReject,
           onCycle: this.handleCycle,
           onInterrupt: this.handleInterrupt,
+          onInputClear: this.handleInputClear,
           onExitRequest: this.handleExit,
+          onRequestExit: this.setRequestExitHandler,
           onExit: () => this.close(),
           onModelSelect: this.handleModelSelect,
           onRows: this.syncRows,
@@ -481,7 +485,7 @@ export class RunFooter implements FooterApi {
   }
 
   public requestExit(): boolean {
-    return this.handleExit()
+    return this.requestExitHandler?.() ?? this.handleExit()
   }
 
   public destroy(): void {
@@ -501,6 +505,20 @@ export class RunFooter implements FooterApi {
 
   private setStatus = (status: string): void => {
     this.patch({ status })
+  }
+
+  private setRequestExitHandler = (fn?: () => boolean): void => {
+    this.requestExitHandler = fn
+  }
+
+  private handleInputClear = (): void => {
+    this.clearInterruptTimer()
+    this.clearExitTimer()
+    if (this.state().interrupt === 0 && this.state().exit === 0) {
+      return
+    }
+
+    this.patch({ interrupt: 0, exit: 0 })
   }
 
   // Resizes the footer to fit the current view. Permission and question views

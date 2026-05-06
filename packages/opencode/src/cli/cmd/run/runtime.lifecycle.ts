@@ -6,8 +6,8 @@
 // the exit splash and tears everything down in the right order:
 // footer.close → footer.destroy → renderer shutdown.
 //
-// Also wires SIGINT so Ctrl-c during a turn triggers the two-press exit
-// sequence through RunFooter.requestExit().
+// Also wires SIGINT so Ctrl-c clears a live prompt draft first, then falls
+// back to the usual two-press exit sequence through RunFooter.requestExit().
 import { createCliRenderer, type CliRenderer, type ScrollbackWriter } from "@opentui/core"
 import { Session as SessionApi } from "@/session/session"
 import * as Locale from "@/util/locale"

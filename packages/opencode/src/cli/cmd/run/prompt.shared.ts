@@ -29,6 +29,7 @@ export type PromptKeys = {
   interrupts: Keybind.Info[]
   previous: Keybind.Info[]
   next: Keybind.Info[]
+  clear: Keybind.Info[]
   bindings: KeyBinding[]
 }
 
@@ -84,6 +85,7 @@ export function promptKeys(keybinds: FooterKeybinds): PromptKeys {
     interrupts: Keybind.parse(keybinds.interrupt),
     previous: Keybind.parse(keybinds.historyPrevious),
     next: Keybind.parse(keybinds.historyNext),
+    clear: Keybind.parse(keybinds.inputClear),
     bindings: textareaBindings(keybinds),
   }
 }
