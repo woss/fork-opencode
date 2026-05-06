@@ -93,6 +93,7 @@ export type PromptState = {
   rows: Accessor<number>
   requestExit: () => boolean
   onSubmit: () => void
+  submitText: (text: string) => void
   onKeyDown: (event: KeyEvent) => void
   onContentChange: () => void
   replaceDraft: (text: string) => void
@@ -976,9 +977,9 @@ export function createPromptState(input: PromptInput): PromptState {
     }
   })
 
-  const onSubmit = () => {
+  const submitPrompt = (next: RunPrompt) => {
     if (!area || area.isDestroyed) {
-      return
+      draft = clonePrompt(next)
     }
 
     if (visible()) {
@@ -990,8 +991,6 @@ export function createPromptState(input: PromptInput): PromptState {
       hide()
     }
 
-    syncDraft()
-    const next = clonePrompt(draft)
     if (!next.text.trim()) {
       input.onStatus(input.state().phase === "running" ? "waiting for current response" : "empty prompt ignored")
       return
@@ -1019,6 +1018,15 @@ export function createPromptState(input: PromptInput): PromptState {
 
       restore(next)
     })
+  }
+
+  const onSubmit = () => {
+    syncDraft()
+    submitPrompt(clonePrompt(draft))
+  }
+
+  const submitText = (text: string) => {
+    submitPrompt({ text, parts: [] })
   }
 
   onCleanup(() => {
@@ -1088,6 +1096,7 @@ export function createPromptState(input: PromptInput): PromptState {
     rows: menu.rows,
     requestExit,
     onSubmit,
+    submitText,
     onKeyDown,
     onContentChange: () => {
       syncDraft()

@@ -148,7 +148,8 @@ test("direct command panel renders grouped command palette", async () => {
         onModel={() => {}}
         onVariant={() => {}}
         onVariantCycle={() => {}}
-        onSlash={() => {}}
+        onCommand={() => {}}
+        onNew={() => {}}
         onExit={() => {}}
       />
     </box>
@@ -168,10 +169,12 @@ test("direct command panel renders grouped command palette", async () => {
     expect(frame).toContain("Variant cycle")
     expect(frame).toContain("Switch model variant")
     expect(frame).toContain("Session")
-    expect(frame).toContain("/new")
+    expect(frame).toContain("New session")
     expect(frame).toContain("Project Commands")
-    expect(frame).toContain("/review")
+    expect(frame).toContain("review")
+    expect(frame).not.toContain("/review")
     expect(frame).not.toContain("/internal")
+    expect(frame).not.toContain("Commands 8")
   } finally {
     app.renderer.destroy()
   }

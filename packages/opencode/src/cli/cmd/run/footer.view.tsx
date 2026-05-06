@@ -421,8 +421,12 @@ export function RunFooterView(props: RunFooterViewProps) {
                           props.onCycle()
                           closePanel()
                         }}
-                        onSlash={(name) => {
-                          composer.replaceDraft(`/${name} `)
+                        onCommand={(name) => {
+                          composer.submitText(`/${name}`)
+                          closePanel()
+                        }}
+                        onNew={() => {
+                          composer.submitText("/new")
                           closePanel()
                         }}
                         onExit={props.onExit}

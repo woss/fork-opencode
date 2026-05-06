@@ -168,6 +168,7 @@ function match<T extends PanelEntry>(query: string, entries: T[]) {
 function PanelShell(props: {
   id: string
   title: string
+  countVisible?: boolean
   query: string
   count: number
   total: number
@@ -208,9 +209,11 @@ function PanelShell(props: {
           <text fg={props.theme().text} attributes={TextAttributes.BOLD} wrapMode="none" flexShrink={0}>
             {props.title}
           </text>
-          <text fg={props.theme().muted} wrapMode="none" flexShrink={0}>
-            {countLabel(props.count, props.total, props.query)}
-          </text>
+          {props.countVisible !== false ? (
+            <text fg={props.theme().muted} wrapMode="none" flexShrink={0}>
+              {countLabel(props.count, props.total, props.query)}
+            </text>
+          ) : null}
           <box flexGrow={1} flexShrink={1} backgroundColor="transparent" />
           <text fg={props.theme().muted} wrapMode="none" truncate flexShrink={0}>
             esc
@@ -280,7 +283,8 @@ export function RunCommandMenuBody(props: {
   onModel: () => void
   onVariant: () => void
   onVariantCycle: () => void
-  onSlash: (name: string) => void
+  onCommand: (name: string) => void
+  onNew: () => void
   onExit: () => void
 }) {
   let field: InputRenderable | undefined
@@ -316,7 +320,7 @@ export function RunCommandMenuBody(props: {
         action: "slash",
         category: "Session",
         name: "new",
-        display: "/new",
+        display: "New session",
         description: "Start a new session",
         keywords: "new session clear",
       },
@@ -328,13 +332,13 @@ export function RunCommandMenuBody(props: {
               action: "slash",
               category: item.source === "mcp" ? "MCP Commands" : "Project Commands",
               name: item.name,
-              display: `/${item.name}`,
+              display: item.name,
               description: item.description,
-              keywords: item.source === "mcp" ? `${item.name} mcp` : item.name,
+              keywords: item.source === "mcp" ? `/${item.name} ${item.name} mcp` : `/${item.name} ${item.name}`,
             }) satisfies CommandEntry,
         )
         .sort((a, b) => categoryRank(a.category) - categoryRank(b.category) || a.display.localeCompare(b.display)),
-      { action: "exit", category: "System", display: "/exit", description: "Close direct mode" },
+      { action: "exit", category: "System", display: "Exit", description: "Close direct mode", keywords: "/exit exit" },
     ]
   })
   const items = createMemo<CommandEntry[]>(() => match(query(), entries()))
@@ -360,7 +364,12 @@ export function RunCommandMenuBody(props: {
       return
     }
 
-    props.onSlash(item.name)
+    if (item.name === "new") {
+      props.onNew()
+      return
+    }
+
+    props.onCommand(item.name)
   }
   const select = () => {
     const item = items()[menu.selected()]
@@ -388,6 +397,7 @@ export function RunCommandMenuBody(props: {
     <PanelShell
       id="run-direct-footer-command-panel"
       title="Commands"
+      countVisible={false}
       query={query()}
       count={items().length}
       total={entries().length}
