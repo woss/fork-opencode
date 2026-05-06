@@ -176,10 +176,6 @@ function blend(color: RGBA, bg: RGBA): RGBA {
   )
 }
 
-function luminance(color: RGBA) {
-  return 0.299 * color.r + 0.587 * color.g + 0.114 * color.b
-}
-
 function chroma(color: RGBA) {
   return Math.max(color.r, color.g, color.b) - Math.min(color.r, color.g, color.b)
 }
@@ -289,24 +285,6 @@ export function resolveTheme(theme: ThemeJson, pick: "dark" | "light"): TuiTheme
   }
 }
 
-function pickPrimaryColor(
-  bg: RGBA,
-  candidates: Array<{
-    key: string
-    color: RGBA | undefined
-  }>,
-) {
-  return candidates
-    .flatMap((item) => {
-      if (!item.color) return []
-      const contrast = Math.abs(luminance(item.color) - luminance(bg))
-      const vivid = chroma(item.color)
-      if (contrast < 0.16 || vivid < 0.12) return []
-      return [{ key: item.key, color: item.color, score: vivid * 1.5 + contrast }]
-    })
-    .sort((a, b) => b.score - a.score)[0]
-}
-
 function generateGrayScale(bg: RGBA, isDark: boolean, map: (rgba: RGBA) => RGBA): Record<number, RGBA> {
   const r = bg.r * 255
   const g = bg.g * 255
@@ -389,34 +367,14 @@ export function generateSystem(colors: TerminalColors, pick: "dark" | "light"): 
 
   const diff_alpha = isDark ? 0.22 : 0.14
   const diff_context_bg = grays[2]
-  const primary =
-    pickPrimaryColor(bg_snapshot, [
-      {
-        key: "cursor",
-        color: colors.cursorColor ? nearest(RGBA.fromHex(colors.cursorColor)) : undefined,
-      },
-      {
-        key: "selection",
-        color: colors.highlightBackground ? nearest(RGBA.fromHex(colors.highlightBackground)) : undefined,
-      },
-      {
-        key: "blue",
-        color: ansi.blue,
-      },
-      {
-        key: "magenta",
-        color: ansi.magenta,
-      },
-    ]) ?? {
-      key: "blue",
-      color: ansi.blue,
-    }
+  const primary = ansi.cyan
+  const secondary = ansi.magenta
 
   return {
     theme: {
-      primary: primary.color,
-      secondary: primary.key === "magenta" ? ansi.blue : ansi.magenta,
-      accent: primary.color,
+      primary,
+      secondary,
+      accent: primary,
       error: ansi.red,
       warning: ansi.yellow,
       success: ansi.green,
@@ -550,13 +508,13 @@ function map(
 }
 
 const seed = {
-  highlight: rgba("#38bdf8"),
-  muted: rgba("#64748b"),
-  text: rgba("#f8fafc"),
+  highlight: RGBA.fromIndex(6, rgba("#38bdf8")),
+  muted: RGBA.fromIndex(8, rgba("#64748b")),
+  text: RGBA.defaultForeground(rgba("#f8fafc")),
   panel: rgba("#0f172a"),
-  success: rgba("#22c55e"),
-  warning: rgba("#f59e0b"),
-  error: rgba("#ef4444"),
+  success: RGBA.fromIndex(2, rgba("#22c55e")),
+  warning: RGBA.fromIndex(3, rgba("#f59e0b")),
+  error: RGBA.fromIndex(1, rgba("#ef4444")),
 }
 
 function tone(body: ColorInput, start?: ColorInput): Tone {

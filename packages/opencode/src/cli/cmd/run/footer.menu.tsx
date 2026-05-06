@@ -16,6 +16,41 @@ type RunFooterMenuRow =
   | { type: "item"; item: RunFooterMenuItem; index: number }
   | { type: "spacer" }
 
+function maxOffset(count: number, limit: number) {
+  return Math.max(0, count - limit)
+}
+
+function previewMargin(limit: number) {
+  return Math.max(0, Math.min(2, Math.floor((limit - 1) / 2)))
+}
+
+function revealOffset(value: number, input: { count: number; limit: number; selected: number }) {
+  const max = maxOffset(input.count, input.limit)
+  if (input.selected < value) {
+    return Math.min(max, input.selected)
+  }
+
+  if (input.selected >= value + input.limit) {
+    return Math.min(max, input.selected - input.limit + 1)
+  }
+
+  return Math.min(max, value)
+}
+
+function moveOffset(value: number, input: { count: number; limit: number; selected: number; dir: -1 | 1 }) {
+  const max = maxOffset(input.count, input.limit)
+  const margin = previewMargin(input.limit)
+  if (input.dir < 0 && input.selected < value + margin) {
+    return Math.max(0, Math.min(max, input.selected - margin))
+  }
+
+  if (input.dir > 0 && input.selected > value + input.limit - margin - 1) {
+    return Math.min(max, input.selected - input.limit + margin + 1)
+  }
+
+  return Math.min(max, value)
+}
+
 export function createFooterMenuState(input: { count: Accessor<number>; limit?: number }) {
   const [selected, setSelected] = createSignal(0)
   const [offset, setOffset] = createSignal(0)
@@ -32,18 +67,7 @@ export function createFooterMenuState(input: { count: Accessor<number>; limit?: 
 
     const next = Math.max(0, Math.min(count - 1, index))
     setSelected(next)
-    setOffset((value) => {
-      const max = Math.max(0, count - limit())
-      if (next < value) {
-        return Math.min(max, next)
-      }
-
-      if (next >= value + limit()) {
-        return Math.min(max, next - limit() + 1)
-      }
-
-      return Math.min(max, value)
-    })
+    setOffset((value) => revealOffset(value, { count, limit: limit(), selected: next }))
   }
 
   const reset = () => {
@@ -62,19 +86,20 @@ export function createFooterMenuState(input: { count: Accessor<number>; limit?: 
       setSelected(count - 1)
     }
 
-    setOffset((value) => {
-      const max = Math.max(0, count - limit())
-      if (selected() < value) {
-        return Math.min(max, selected())
-      }
-
-      if (selected() >= value + limit()) {
-        return Math.min(max, selected() - limit() + 1)
-      }
-
-      return Math.min(max, value)
-    })
+    setOffset((value) => revealOffset(value, { count, limit: limit(), selected: selected() }))
   })
+
+  const move = (dir: -1 | 1) => {
+    const count = input.count()
+    if (count === 0) {
+      reset()
+      return
+    }
+
+    const next = Math.max(0, Math.min(count - 1, selected() + dir))
+    setSelected(next)
+    setOffset((value) => moveOffset(value, { count, limit: limit(), selected: next, dir }))
+  }
 
   return {
     selected,
@@ -82,7 +107,7 @@ export function createFooterMenuState(input: { count: Accessor<number>; limit?: 
     rows,
     reveal,
     reset,
-    move: (dir: -1 | 1) => reveal(selected() + dir),
+    move,
   }
 }
 
@@ -102,15 +127,9 @@ export function RunFooterMenu(props: {
 }) {
   const limit = () => props.limit ?? FOOTER_MENU_ROWS
   const border = () => props.border ?? true
-  const rows = createMemo<RunFooterMenuRow[]>(() => {
-    if (!props.grouped) {
-      return props.items().slice(props.offset(), props.offset() + limit()).map((item, index) => ({
-        type: "item",
-        item,
-        index: index + props.offset(),
-      }))
-    }
-
+  const [groupOffset, setGroupOffset] = createSignal(0)
+  let previous = -1
+  const groupedRows = createMemo<RunFooterMenuRow[]>(() => {
     const all: RunFooterMenuRow[] = []
     let category = ""
     props.items().forEach((item, index) => {
@@ -125,13 +144,45 @@ export function RunFooterMenu(props: {
 
       all.push({ type: "item", item, index })
     })
+    return all
+  })
 
-    const selected = all.findIndex((item) => item.type === "item" && item.index === props.selected())
-    if (selected === -1) {
-      return all.slice(0, limit())
+  createEffect(() => {
+    if (!props.grouped) {
+      return
     }
 
-    const start = Math.max(0, Math.min(selected - limit() + 1, all.length - limit()))
+    const all = groupedRows()
+    const selected = all.findIndex((item) => item.type === "item" && item.index === props.selected())
+    if (all.length === 0 || selected === -1) {
+      setGroupOffset(0)
+      previous = props.selected()
+      return
+    }
+
+    const dir =
+      props.selected() === previous + 1 ? 1
+      : props.selected() === previous - 1 ? -1
+      : undefined
+    setGroupOffset((value) =>
+      dir
+        ? moveOffset(value, { count: all.length, limit: limit(), selected, dir })
+        : revealOffset(value, { count: all.length, limit: limit(), selected }),
+    )
+    previous = props.selected()
+  })
+
+  const rows = createMemo<RunFooterMenuRow[]>(() => {
+    if (!props.grouped) {
+      return props.items().slice(props.offset(), props.offset() + limit()).map((item, index) => ({
+        type: "item",
+        item,
+        index: index + props.offset(),
+      }))
+    }
+
+    const all = groupedRows()
+    const start = Math.max(0, Math.min(groupOffset(), all.length - limit()))
     return all.slice(start, start + limit())
   })
   const descriptionColumn = createMemo(() => {
@@ -189,6 +240,7 @@ export function RunFooterMenu(props: {
           }
 
           const active = () => row.index === props.selected()
+          const inset = () => (active() ? 1 : 0)
           return (
             <box paddingRight={0} flexDirection="row" backgroundColor={transparent}>
               {border() ? (
@@ -199,19 +251,27 @@ export function RunFooterMenu(props: {
               <box
                 flexGrow={1}
                 flexShrink={1}
-                paddingLeft={props.paddingLeft ?? 1}
-                paddingRight={props.paddingRight ?? 0}
-                backgroundColor={active() ? props.theme().highlight : props.theme().surface}
+                paddingLeft={inset()}
+                paddingRight={inset()}
+                backgroundColor={props.theme().surface}
               >
-                <text fg={active() ? props.theme().surface : props.theme().text} wrapMode="none" truncate>
-                  {row.item.display}
-                  {row.item.description ? (
-                    <span style={{ fg: active() ? props.theme().surface : props.theme().muted }}>
-                      {descriptionPad(row.item)}
-                      {row.item.description}
-                    </span>
-                  ) : undefined}
-                </text>
+                <box
+                  flexGrow={1}
+                  flexShrink={1}
+                  paddingLeft={Math.max(0, (props.paddingLeft ?? 1) - inset())}
+                  paddingRight={Math.max(0, (props.paddingRight ?? 0) - inset())}
+                  backgroundColor={active() ? props.theme().highlight : props.theme().surface}
+                >
+                  <text fg={active() ? props.theme().surface : props.theme().text} wrapMode="none" truncate>
+                    {row.item.display}
+                    {row.item.description ? (
+                      <span style={{ fg: active() ? props.theme().surface : props.theme().muted }}>
+                        {descriptionPad(row.item)}
+                        {row.item.description}
+                      </span>
+                    ) : undefined}
+                  </text>
+                </box>
               </box>
             </box>
           )

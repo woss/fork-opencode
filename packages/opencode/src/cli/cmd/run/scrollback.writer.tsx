@@ -1,12 +1,12 @@
 /** @jsxImportSource @opentui/solid */
 
 import { createScrollbackWriter } from "@opentui/solid"
-import { TextRenderable, type ScrollbackWriter } from "@opentui/core"
+import { TextRenderable, type ColorInput, type ScrollbackWriter } from "@opentui/core"
 import { Match, Switch, createMemo } from "solid-js"
 import { entryBody, entryFlags } from "./entry.body"
 import { entryColor, entryLook, entrySyntax } from "./scrollback.shared"
 import { toolDiffView, toolFiletype, toolStructuredFinal } from "./tool"
-import { RUN_THEME_FALLBACK, type RunTheme } from "./theme"
+import { RUN_THEME_FALLBACK, transparent, type RunTheme } from "./theme"
 import type { EntryLayout, RunEntryBody, ScrollbackOptions, StreamCommit } from "./types"
 
 function todoText(item: { status: string; content: string }): string {
@@ -94,6 +94,10 @@ export function RunEntryContent(props: {
   const style = createMemo(() => entryLook(props.commit, theme().entry))
   const syntax = createMemo(() => entrySyntax(props.commit, theme()))
   const color = createMemo(() => entryColor(props.commit, theme()))
+  const suppressBackgrounds = createMemo(() => props.opts?.suppressBackgrounds === true)
+  const diffBg = (color: ColorInput) => (suppressBackgrounds() ? transparent : color)
+  const diffSign = (normal: ColorInput, highlight: ColorInput) => (suppressBackgrounds() ? normal : highlight)
+  const diffTitle = createMemo(() => (suppressBackgrounds() ? theme().block.text : theme().block.muted))
   const streaming = createMemo(() => props.commit.phase === "progress")
   const width = createMemo(() => Math.max(1, Math.trunc(props.width ?? 80)))
   const view = createMemo(() => toolDiffView(width(), props.opts?.diffStyle))
@@ -184,7 +188,7 @@ export function RunEntryContent(props: {
           <box width="100%" flexDirection="column" gap={1}>
             {snap().items.map((item) => (
               <box width="100%" flexDirection="column" gap={1}>
-                <text width="100%" wrapMode="word" fg={theme().block.muted}>
+                <text width="100%" wrapMode="word" fg={diffTitle()}>
                   {item.title}
                 </text>
                 {item.diff.trim() ? (
@@ -198,15 +202,15 @@ export function RunEntryContent(props: {
                       width="100%"
                       wrapMode="word"
                       fg={theme().block.text}
-                      addedBg={theme().block.diffAddedBg}
-                      removedBg={theme().block.diffRemovedBg}
-                      contextBg={theme().block.diffContextBg}
-                      addedSignColor={theme().block.diffHighlightAdded}
-                      removedSignColor={theme().block.diffHighlightRemoved}
+                      addedBg={diffBg(theme().block.diffAddedBg)}
+                      removedBg={diffBg(theme().block.diffRemovedBg)}
+                      contextBg={diffBg(theme().block.diffContextBg)}
+                      addedSignColor={diffSign(theme().block.diffAdded, theme().block.diffHighlightAdded)}
+                      removedSignColor={diffSign(theme().block.diffRemoved, theme().block.diffHighlightRemoved)}
                       lineNumberFg={theme().block.diffLineNumber}
-                      lineNumberBg={theme().block.diffContextBg}
-                      addedLineNumberBg={theme().block.diffAddedLineNumberBg}
-                      removedLineNumberBg={theme().block.diffRemovedLineNumberBg}
+                      lineNumberBg={diffBg(theme().block.diffContextBg)}
+                      addedLineNumberBg={diffBg(theme().block.diffAddedLineNumberBg)}
+                      removedLineNumberBg={diffBg(theme().block.diffRemovedLineNumberBg)}
                     />
                   </box>
                 ) : (
@@ -309,7 +313,14 @@ export function entryWriter(input: {
   opts?: ScrollbackOptions
 }): ScrollbackWriter {
   return createScrollbackWriter(
-    (ctx) => <RunEntryContent commit={input.commit} theme={input.theme} opts={input.opts} width={ctx.width} />,
+    (ctx) => (
+      <RunEntryContent
+        commit={input.commit}
+        theme={input.theme}
+        opts={{ ...input.opts, suppressBackgrounds: true }}
+        width={ctx.width}
+      />
+    ),
     entryFlags(input.commit),
   )
 }

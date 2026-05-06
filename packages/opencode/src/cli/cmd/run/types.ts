@@ -89,6 +89,7 @@ export type RunDiffStyle = "auto" | "stacked"
 
 export type ScrollbackOptions = {
   diffStyle?: RunDiffStyle
+  suppressBackgrounds?: boolean
 }
 
 export type ToolCodeSnapshot = {
