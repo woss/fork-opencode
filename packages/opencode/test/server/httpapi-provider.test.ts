@@ -17,8 +17,8 @@ const providerID = "test-oauth-parity"
 const oauthURL = "https://example.com/oauth"
 const oauthInstructions = "Finish OAuth"
 
-function app(experimental: boolean) {
-  return experimental ? Server.Default().app : Server.Default().app
+function app() {
+  return Server.Default().app
 }
 
 function requestAuthorize(input: {
@@ -104,42 +104,27 @@ afterEach(async () => {
 
 describe("provider HttpApi", () => {
   it.live(
-    "matches legacy OAuth authorize response shapes",
+    "serves OAuth authorize response shapes",
     withProviderProject((dir) =>
       Effect.gen(function* () {
         const headers = { "x-opencode-directory": dir, "content-type": "application/json" }
-        const legacy = app(false)
-        const httpapi = app(true)
+        const server = app()
 
-        const apiLegacy = yield* requestAuthorize({
-          app: legacy,
+        const api = yield* requestAuthorize({
+          app: server,
           providerID,
           method: 0,
           headers,
         })
-        const apiHttpApi = yield* requestAuthorize({
-          app: httpapi,
-          providerID,
-          method: 0,
-          headers,
-        })
-        expect(apiLegacy).toEqual({ status: 200, body: "" })
-        expect(apiHttpApi).toEqual(apiLegacy)
+        expect(api).toEqual({ status: 200, body: "" })
 
-        const oauthLegacy = yield* requestAuthorize({
-          app: legacy,
+        const oauth = yield* requestAuthorize({
+          app: server,
           providerID,
           method: 1,
           headers,
         })
-        const oauthHttpApi = yield* requestAuthorize({
-          app: httpapi,
-          providerID,
-          method: 1,
-          headers,
-        })
-        expect(oauthHttpApi).toEqual(oauthLegacy)
-        expect(JSON.parse(oauthHttpApi.body)).toEqual({
+        expect(JSON.parse(oauth.body)).toEqual({
           url: oauthURL,
           method: "code",
           instructions: oauthInstructions,

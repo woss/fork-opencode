@@ -29,7 +29,6 @@ import { errorData } from "@/util/error"
 import { waitEvent } from "./util"
 import { WorkspaceContext } from "./workspace-context"
 import { EffectBridge } from "@/effect/bridge"
-import { NonNegativeInt } from "@/util/schema"
 
 export const Info = WorkspaceInfoSchema
 export type Info = WorkspaceInfo
