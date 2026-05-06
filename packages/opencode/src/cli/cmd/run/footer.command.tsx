@@ -12,12 +12,22 @@ type PanelEntry = RunFooterMenuItem & {
   keywords?: string
 }
 
-type CommandEntry = PanelEntry & ({ action: "model" } | { action: "slash"; name: string } | { action: "exit" })
+type CommandEntry =
+  | (PanelEntry & { action: "model" })
+  | (PanelEntry & { action: "variant.cycle" })
+  | (PanelEntry & { action: "variant.list" })
+  | (PanelEntry & { action: "slash"; name: string })
+  | (PanelEntry & { action: "exit" })
 
 type ModelEntry = PanelEntry & {
   providerID: string
   modelID: string
   providerName: string
+  current: boolean
+}
+
+type VariantEntry = PanelEntry & {
+  variant: string | undefined
   current: boolean
 }
 
@@ -265,8 +275,11 @@ function PanelShell(props: {
 export function RunCommandMenuBody(props: {
   theme: Accessor<RunFooterTheme>
   commands: Accessor<RunCommand[] | undefined>
+  variants: Accessor<string[]>
   onClose: () => void
   onModel: () => void
+  onVariant: () => void
+  onVariantCycle: () => void
   onSlash: (name: string) => void
   onExit: () => void
 }) {
@@ -281,6 +294,24 @@ export function RunCommandMenuBody(props: {
         display: "Switch model",
         description: "Choose model for future turns",
       },
+      {
+        action: "variant.cycle",
+        category: "Suggested",
+        display: "Variant cycle",
+        description: "Cycle reasoning effort for future turns",
+        keywords: "variant cycle",
+      },
+      ...(props.variants().length > 0
+        ? [
+            {
+              action: "variant.list" as const,
+              category: "Suggested",
+              display: "Switch model variant",
+              description: "Choose reasoning effort for future turns",
+              keywords: `variant variants ${props.variants().join(" ")}`,
+            },
+          ]
+        : []),
       {
         action: "slash",
         category: "Session",
@@ -311,6 +342,16 @@ export function RunCommandMenuBody(props: {
   const pick = (item: CommandEntry) => {
     if (item.action === "model") {
       props.onModel()
+      return
+    }
+
+    if (item.action === "variant.cycle") {
+      props.onVariantCycle()
+      return
+    }
+
+    if (item.action === "variant.list") {
+      props.onVariant()
       return
     }
 
@@ -370,6 +411,103 @@ export function RunCommandMenuBody(props: {
         paddingLeft={PANEL_PAD}
         paddingRight={PANEL_PAD}
         grouped={!query().trim()}
+      />
+    </PanelShell>
+  )
+}
+
+export function RunVariantSelectBody(props: {
+  theme: Accessor<RunFooterTheme>
+  variants: Accessor<string[]>
+  current: Accessor<string | undefined>
+  onClose: () => void
+  onSelect: (variant: string | undefined) => void
+}) {
+  let field: InputRenderable | undefined
+  const [query, setQuery] = createSignal("")
+  const entries = createMemo<VariantEntry[]>(() => [
+    {
+      category: "",
+      display: "Default",
+      description: props.current() === undefined ? "current" : undefined,
+      keywords: "default",
+      variant: undefined,
+      current: props.current() === undefined,
+    },
+    ...props.variants().map((variant) => ({
+      category: "",
+      display: variant,
+      description: props.current() === variant ? "current" : undefined,
+      keywords: variant,
+      variant,
+      current: props.current() === variant,
+    })),
+  ])
+  const items = createMemo<VariantEntry[]>(() => match(query(), entries()))
+  const menu = createFooterMenuState({ count: () => items().length, limit: PANEL_LIST_ROWS })
+  const pick = (item: VariantEntry) => {
+    props.onSelect(item.variant)
+  }
+  const select = () => {
+    const item = items()[menu.selected()]
+    if (!item) {
+      return
+    }
+
+    pick(item)
+  }
+
+  createEffect(() => {
+    query()
+    menu.reset()
+  })
+
+  createEffect(() => {
+    if (query().trim()) {
+      return
+    }
+
+    const index = items().findIndex((item) => item.current)
+    if (index !== -1) {
+      menu.reveal(index)
+    }
+  })
+
+  useKeyboard((event) => {
+    if (event.defaultPrevented) {
+      return
+    }
+
+    handleKey({ event, menu, field: () => field, setQuery, select, close: props.onClose })
+  })
+
+  return (
+    <PanelShell
+      id="run-direct-footer-variant-panel"
+      title="Select variant"
+      query={query()}
+      count={items().length}
+      total={entries().length}
+      placeholder="Search"
+      theme={props.theme}
+      inputRef={(input) => {
+        field = input
+      }}
+      onQuery={setQuery}
+    >
+      <RunFooterMenu
+        id="run-direct-footer-variant-list"
+        theme={props.theme}
+        items={items}
+        selected={menu.selected}
+        offset={menu.offset}
+        rows={() => PANEL_LIST_ROWS}
+        limit={PANEL_LIST_ROWS}
+        empty="No results found"
+        border={false}
+        paddingLeft={PANEL_PAD}
+        paddingRight={PANEL_PAD}
+        grouped={false}
       />
     </PanelShell>
   )

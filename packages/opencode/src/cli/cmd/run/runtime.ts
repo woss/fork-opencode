@@ -292,6 +292,7 @@ async function runInteractiveRuntime(input: RunRuntimeInput): Promise<void> {
           return {
             status: state.activeVariant ? `variant ${state.activeVariant}` : "variant default",
             modelLabel: formatModelLabel(state.model, state.activeVariant, state.providers),
+            variant: state.activeVariant,
           }
         },
         onModelSelect: async (model) => {
@@ -329,6 +330,33 @@ async function runInteractiveRuntime(input: RunRuntimeInput): Promise<void> {
           return {
             modelLabel: formatModelLabel(model, state.activeVariant, state.providers),
             status: `model ${model.modelID}`,
+            variant: state.activeVariant,
+            variants: state.variants,
+          }
+        },
+        onVariantSelect: async (variant) => {
+          if (!state.model || state.variants.length === 0) {
+            return {
+              status: "no variants available",
+            }
+          }
+
+          if (variant && !state.variants.includes(variant)) {
+            return {
+              status: `variant ${variant} unavailable`,
+            }
+          }
+
+          state.activeVariant = variant
+          saveVariant(state.model, state.activeVariant)
+          setRunSpanAttributes(span, {
+            "opencode.model.variant": state.activeVariant,
+          })
+          return {
+            status: state.activeVariant ? `variant ${state.activeVariant}` : "variant default",
+            modelLabel: formatModelLabel(state.model, state.activeVariant, state.providers),
+            variant: state.activeVariant,
+            variants: state.variants,
           }
         },
         onInterrupt: () => {
@@ -420,20 +448,22 @@ async function runInteractiveRuntime(input: RunRuntimeInput): Promise<void> {
         state.providers = info.providers
         state.variants = variantsFor(state.providers, state.model)
         state.limits = info.limits
-        if (!footer.isClosed) {
-          footer.event({ type: "models", providers: info.providers })
-        }
 
         const next = resolveVariant(ctx.variant, session.variant, savedVariant, state.variants)
-        if (next === state.activeVariant) {
+        if (next !== state.activeVariant) {
+          state.activeVariant = next
+          setRunSpanAttributes(span, {
+            "opencode.model.variant": state.activeVariant,
+          })
+        }
+
+        if (footer.isClosed) {
           return
         }
 
-        state.activeVariant = next
-        setRunSpanAttributes(span, {
-          "opencode.model.variant": state.activeVariant,
-        })
-        if (!state.model || footer.isClosed) {
+        footer.event({ type: "models", providers: info.providers })
+        footer.event({ type: "variants", variants: state.variants, current: state.activeVariant })
+        if (!state.model) {
           return
         }
 

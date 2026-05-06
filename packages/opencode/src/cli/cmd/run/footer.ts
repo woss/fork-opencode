@@ -61,6 +61,8 @@ import type {
 type CycleResult = {
   modelLabel?: string
   status?: string
+  variant?: string | undefined
+  variants?: string[]
 }
 
 type RunFooterOptions = {
@@ -74,6 +76,7 @@ type RunFooterOptions = {
   agentLabel: string
   modelLabel: string
   model: RunInput["model"]
+  variant: string | undefined
   first: boolean
   history?: RunPrompt[]
   theme: RunTheme
@@ -84,6 +87,7 @@ type RunFooterOptions = {
   onQuestionReject: (input: QuestionReject) => void | Promise<void>
   onCycleVariant?: () => CycleResult | void
   onModelSelect?: (model: NonNullable<RunInput["model"]>) => CycleResult | void | Promise<CycleResult | void>
+  onVariantSelect?: (variant: string | undefined) => CycleResult | void | Promise<CycleResult | void>
   onInterrupt?: () => void
   onExit?: () => void
   onSubagentSelect?: (sessionID: string | undefined) => void
@@ -94,6 +98,7 @@ const PERMISSION_ROWS = 12
 const QUESTION_ROWS = 14
 const COMMAND_ROWS = RUN_COMMAND_PANEL_ROWS
 const MODEL_ROWS = RUN_COMMAND_PANEL_ROWS
+const VARIANT_ROWS = RUN_COMMAND_PANEL_ROWS
 const AUTOCOMPLETE_COMPACT_ROWS = 2
 
 function createEmptySubagentState(): FooterSubagentState {
@@ -174,6 +179,10 @@ export class RunFooter implements FooterApi {
   private setProviders: Setter<RunProvider[] | undefined>
   private currentModel: Accessor<RunInput["model"]>
   private setCurrentModel: Setter<RunInput["model"]>
+  private variants: Accessor<string[]>
+  private setVariants: Setter<string[]>
+  private currentVariant: Accessor<string | undefined>
+  private setCurrentVariant: Setter<string | undefined>
   private state: Accessor<FooterState>
   private setState: Setter<FooterState>
   private view: Accessor<FooterView>
@@ -224,6 +233,12 @@ export class RunFooter implements FooterApi {
     const [currentModel, setCurrentModel] = createSignal<RunInput["model"]>(options.model)
     this.currentModel = currentModel
     this.setCurrentModel = setCurrentModel
+    const [variants, setVariants] = createSignal<string[]>([])
+    this.variants = variants
+    this.setVariants = setVariants
+    const [currentVariant, setCurrentVariant] = createSignal(options.variant)
+    this.currentVariant = currentVariant
+    this.setCurrentVariant = setCurrentVariant
     const [subagent, setSubagent] = createStore<FooterSubagentState>(createEmptySubagentState())
     this.subagent = () => subagent
     this.setSubagent = (next) => {
@@ -256,6 +271,8 @@ export class RunFooter implements FooterApi {
           commands: this.commands,
           providers: this.providers,
           currentModel: this.currentModel,
+          variants: this.variants,
+          currentVariant: this.currentVariant,
           theme: options.theme,
           diffStyle: options.diffStyle,
           keybinds: options.keybinds,
@@ -272,6 +289,7 @@ export class RunFooter implements FooterApi {
           onRequestExit: this.setRequestExitHandler,
           onExit: () => this.close(),
           onModelSelect: this.handleModelSelect,
+          onVariantSelect: this.handleVariantSelect,
           onRows: this.syncRows,
           onLayout: this.syncLayout,
           onStatus: this.setStatus,
@@ -332,6 +350,16 @@ export class RunFooter implements FooterApi {
       }
 
       this.setProviders(next.providers)
+      return
+    }
+
+    if (next.type === "variants") {
+      if (this.isGone) {
+        return
+      }
+
+      this.setVariants(next.variants)
+      this.setCurrentVariant(next.current)
       return
     }
 
@@ -537,6 +565,8 @@ export class RunFooter implements FooterApi {
             ? 1 + tabs + COMMAND_ROWS
             : this.promptRoute.type === "model"
               ? 1 + tabs + MODEL_ROWS
+              : this.promptRoute.type === "variant"
+                ? 1 + tabs + VARIANT_ROWS
               : this.promptRoute.type === "subagent"
                 ? this.base + tabs + SUBAGENT_INSPECTOR_ROWS
                 : Math.max(base + TEXTAREA_MIN_ROWS, Math.min(base + PROMPT_MAX_ROWS, base + this.rows))
@@ -627,6 +657,14 @@ export class RunFooter implements FooterApi {
       status: result.status ?? "variant updated",
     }
 
+    if ("variants" in result) {
+      this.setVariants(result.variants ?? [])
+    }
+
+    if ("variant" in result) {
+      this.setCurrentVariant(result.variant)
+    }
+
     if (result.modelLabel) {
       patch.model = result.modelLabel
     }
@@ -652,6 +690,56 @@ export class RunFooter implements FooterApi {
           current.modelID !== model.modelID
         ) {
           return
+        }
+
+        if ("variants" in result) {
+          this.setVariants(result.variants ?? [])
+        }
+
+        if ("variant" in result) {
+          this.setCurrentVariant(result.variant)
+        }
+
+        const patch: FooterPatch = {}
+        if (result.modelLabel) {
+          patch.model = result.modelLabel
+        }
+
+        if (result.status) {
+          patch.status = result.status
+        }
+
+        if (patch.model || patch.status) {
+          this.patch(patch)
+        }
+      })
+      .catch(() => {})
+  }
+
+  private handleVariantSelect = (variant: string | undefined): void => {
+    if (this.isClosed) {
+      return
+    }
+
+    const model = this.currentModel()
+    void Promise.resolve()
+      .then(() => this.options.onVariantSelect?.(variant))
+      .then((result) => {
+        const current = this.currentModel()
+        if (
+          !result ||
+          this.isClosed ||
+          (model && (!current || current.providerID !== model.providerID || current.modelID !== model.modelID))
+        ) {
+          return
+        }
+
+        if ("variants" in result) {
+          this.setVariants(result.variants ?? [])
+        }
+
+        if ("variant" in result) {
+          this.setCurrentVariant(result.variant)
         }
 
         const patch: FooterPatch = {}

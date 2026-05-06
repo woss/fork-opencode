@@ -2,7 +2,7 @@
 import { expect, test } from "bun:test"
 import { testRender } from "@opentui/solid"
 import { createSignal } from "solid-js"
-import { RUN_COMMAND_PANEL_ROWS, RunCommandMenuBody, RunModelSelectBody } from "@/cli/cmd/run/footer.command"
+import { RUN_COMMAND_PANEL_ROWS, RunCommandMenuBody, RunModelSelectBody, RunVariantSelectBody } from "@/cli/cmd/run/footer.command"
 import { RunEntryContent } from "@/cli/cmd/run/scrollback.writer"
 import { RUN_THEME_FALLBACK } from "@/cli/cmd/run/theme"
 import type { RunCommand, RunInput, RunProvider, StreamCommit } from "@/cli/cmd/run/types"
@@ -17,7 +17,13 @@ function command(input: { name: string; description: string; source?: "command" 
   } satisfies RunCommand
 }
 
-function model(input: { id: string; name: string; status?: "active" | "deprecated"; cost?: number }) {
+function model(input: {
+  id: string
+  name: string
+  status?: "active" | "deprecated"
+  cost?: number
+  variants?: Record<string, Record<string, never>>
+}) {
   return {
     id: input.id,
     providerID: "opencode",
@@ -64,6 +70,7 @@ function model(input: { id: string; name: string; status?: "active" | "deprecate
     options: {},
     headers: {},
     release_date: "2026-01-01",
+    variants: input.variants,
   } satisfies RunProvider["models"][string]
 }
 
@@ -75,7 +82,7 @@ function provider() {
     env: [],
     options: {},
     models: {
-      "gpt-5": model({ id: "gpt-5", name: "GPT-5" }),
+      "gpt-5": model({ id: "gpt-5", name: "GPT-5", variants: { high: {}, minimal: {} } }),
       "gpt-free": model({ id: "gpt-free", name: "GPT Free", cost: 0 }),
       old: model({ id: "old", name: "Old Model", status: "deprecated" }),
     },
@@ -129,14 +136,18 @@ test("direct command panel renders grouped command palette", async () => {
     command({ name: "deploy", description: "Deploy prompt", source: "mcp" }),
     command({ name: "internal", description: "Skill command", source: "skill" }),
   ])
+  const [variants] = createSignal(["high", "minimal"])
 
   const app = await testRender(() => (
     <box width={100} height={RUN_COMMAND_PANEL_ROWS}>
       <RunCommandMenuBody
         theme={() => RUN_THEME_FALLBACK.footer}
         commands={commands}
+        variants={variants}
         onClose={() => {}}
         onModel={() => {}}
+        onVariant={() => {}}
+        onVariantCycle={() => {}}
         onSlash={() => {}}
         onExit={() => {}}
       />
@@ -154,6 +165,8 @@ test("direct command panel renders grouped command palette", async () => {
     expect(frame).toContain("Search")
     expect(frame).toContain("Suggested")
     expect(frame).toContain("Switch model")
+    expect(frame).toContain("Variant cycle")
+    expect(frame).toContain("Switch model variant")
     expect(frame).toContain("Session")
     expect(frame).toContain("/new")
     expect(frame).toContain("Project Commands")
@@ -195,6 +208,39 @@ test("direct model panel renders current model selector", async () => {
     expect(frame).toContain("GPT Free")
     expect(frame).toContain("Free")
     expect(frame).not.toContain("Old Model")
+  } finally {
+    app.renderer.destroy()
+  }
+})
+
+test("direct variant panel renders current variant selector", async () => {
+  const [variants] = createSignal(["high", "minimal"])
+  const [current] = createSignal<string | undefined>("high")
+
+  const app = await testRender(() => (
+    <box width={100} height={RUN_COMMAND_PANEL_ROWS}>
+      <RunVariantSelectBody
+        theme={() => RUN_THEME_FALLBACK.footer}
+        variants={variants}
+        current={current}
+        onClose={() => {}}
+        onSelect={() => {}}
+      />
+    </box>
+  ), {
+    width: 100,
+    height: RUN_COMMAND_PANEL_ROWS,
+  })
+
+  try {
+    await app.renderOnce()
+    const frame = app.captureCharFrame()
+
+    expect(frame).toContain("Select variant")
+    expect(frame).toContain("Default")
+    expect(frame).toContain("high")
+    expect(frame).toContain("minimal")
+    expect(frame).toContain("current")
   } finally {
     app.renderer.destroy()
   }

@@ -163,6 +163,7 @@ export type FooterPromptRoute =
   | { type: "subagent"; sessionID: string }
   | { type: "command" }
   | { type: "model" }
+  | { type: "variant" }
 
 export type FooterSubagentTab = {
   sessionID: string
@@ -208,6 +209,11 @@ export type FooterEvent =
   | {
       type: "models"
       providers: RunProvider[]
+    }
+  | {
+      type: "variants"
+      variants: string[]
+      current: string | undefined
     }
   | {
       type: "queue"

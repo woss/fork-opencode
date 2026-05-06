@@ -15,7 +15,7 @@ import { Match, Show, Switch, createEffect, createMemo, createSignal, onCleanup 
 import "opentui-spinner/solid"
 import { createColors, createFrames } from "../tui/ui/spinner"
 import * as Keybind from "@/util/keybind"
-import { RunCommandMenuBody, RunModelSelectBody } from "./footer.command"
+import { RunCommandMenuBody, RunModelSelectBody, RunVariantSelectBody } from "./footer.command"
 import { FOOTER_MENU_ROWS, RunFooterMenu } from "./footer.menu"
 import { RunFooterSubagentBody, RunFooterSubagentTabs } from "./footer.subagent"
 import { RunPromptBody, createPromptState, hintFlags } from "./footer.prompt"
@@ -63,6 +63,8 @@ type RunFooterViewProps = {
   commands: () => RunCommand[] | undefined
   providers: () => RunProvider[] | undefined
   currentModel: () => RunInput["model"]
+  variants: () => string[]
+  currentVariant: () => string | undefined
   state: () => FooterState
   view?: () => FooterView
   subagent?: () => FooterSubagentState
@@ -82,6 +84,7 @@ type RunFooterViewProps = {
   onRequestExit?: (fn: (() => boolean) | undefined) => void
   onExit: () => void
   onModelSelect: (model: NonNullable<RunInput["model"]>) => void
+  onVariantSelect: (variant: string | undefined) => void
   onRows: (rows: number) => void
   onLayout: (input: { route: FooterPromptRoute; tabs: boolean; autocomplete: boolean }) => void
   onStatus: (text: string) => void
@@ -127,7 +130,8 @@ export function RunFooterView(props: RunFooterViewProps) {
   const inspecting = createMemo(() => active().type === "prompt" && route().type === "subagent")
   const commanding = createMemo(() => active().type === "prompt" && route().type === "command")
   const modeling = createMemo(() => active().type === "prompt" && route().type === "model")
-  const panel = createMemo(() => commanding() || modeling())
+  const varianting = createMemo(() => active().type === "prompt" && route().type === "variant")
+  const panel = createMemo(() => commanding() || modeling() || varianting())
   const selected = createMemo(() => {
     const current = route()
     return current.type === "subagent" ? current.sessionID : undefined
@@ -138,7 +142,7 @@ export function RunFooterView(props: RunFooterViewProps) {
     const current = route()
     return current.type === "subagent" ? subagent().details[current.sessionID] : undefined
   })
-  const variant = createMemo(() => printableBinding(props.keybinds.variantCycle, props.keybinds.leader))
+  const command = createMemo(() => printableBinding(props.keybinds.commandList, props.keybinds.leader))
   const interrupt = createMemo(() => printableBinding(props.keybinds.interrupt, props.keybinds.leader))
   const commandKeys = createMemo(() => Keybind.parse(props.keybinds.commandList))
   const hints = createMemo(() => hintFlags(term().width))
@@ -192,6 +196,11 @@ export function RunFooterView(props: RunFooterViewProps) {
 
   const openModel = () => {
     setRoute({ type: "model" })
+    props.onSubagentSelect?.(undefined)
+  }
+
+  const openVariant = () => {
+    setRoute({ type: "variant" })
     props.onSubagentSelect?.(undefined)
   }
 
@@ -328,7 +337,7 @@ export function RunFooterView(props: RunFooterViewProps) {
     }
 
     const current = route()
-    if (current.type !== "command" && current.type !== "model") {
+    if (current.type !== "command" && current.type !== "model" && current.type !== "variant") {
       return
     }
 
@@ -404,8 +413,14 @@ export function RunFooterView(props: RunFooterViewProps) {
                       <RunCommandMenuBody
                         theme={theme}
                         commands={props.commands}
+                        variants={props.variants}
                         onClose={closePanel}
                         onModel={openModel}
+                        onVariant={openVariant}
+                        onVariantCycle={() => {
+                          props.onCycle()
+                          closePanel()
+                        }}
                         onSlash={(name) => {
                           composer.replaceDraft(`/${name} `)
                           closePanel()
@@ -421,6 +436,18 @@ export function RunFooterView(props: RunFooterViewProps) {
                         onClose={closePanel}
                         onSelect={(model) => {
                           props.onModelSelect(model)
+                          closePanel()
+                        }}
+                      />
+                    </Match>
+                    <Match when={varianting()}>
+                      <RunVariantSelectBody
+                        theme={theme}
+                        variants={props.variants}
+                        current={props.currentVariant}
+                        onClose={closePanel}
+                        onSelect={(variant) => {
+                          props.onVariantSelect(variant)
                           closePanel()
                         }}
                       />
@@ -608,9 +635,9 @@ export function RunFooterView(props: RunFooterViewProps) {
                           {usage()}
                         </text>
                       </Show>
-                      <Show when={variant().length > 0 && hints().variant}>
-                        <text id="run-direct-footer-hint-variant" fg={theme().muted} wrapMode="none" truncate>
-                          {variant()} variant
+                      <Show when={command().length > 0 && hints().command}>
+                        <text id="run-direct-footer-hint-command" fg={theme().text} wrapMode="none" truncate>
+                          {command()} <span style={{ fg: theme().muted }}>commands</span>
                         </text>
                       </Show>
                     </box>

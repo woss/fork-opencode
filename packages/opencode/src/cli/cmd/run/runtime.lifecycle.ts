@@ -39,6 +39,8 @@ type SplashState = {
 type CycleResult = {
   modelLabel?: string
   status?: string
+  variant?: string | undefined
+  variants?: string[]
 }
 
 type FooterLabels = {
@@ -66,6 +68,7 @@ export type LifecycleInput = {
   onQuestionReject: (input: QuestionReject) => void | Promise<void>
   onCycleVariant?: () => CycleResult | void
   onModelSelect?: (model: NonNullable<RunInput["model"]>) => CycleResult | void | Promise<CycleResult | void>
+  onVariantSelect?: (variant: string | undefined) => CycleResult | void | Promise<CycleResult | void>
   onInterrupt?: () => void
   onSubagentSelect?: (sessionID: string | undefined) => void
 }
@@ -222,6 +225,7 @@ export async function createRuntimeLifecycle(input: LifecycleInput): Promise<Lif
           sessionID: input.getSessionID ?? (() => input.sessionID),
           ...labels,
           model: input.model,
+          variant: input.variant,
           first: input.first,
           history: input.history,
           theme,
@@ -233,6 +237,7 @@ export async function createRuntimeLifecycle(input: LifecycleInput): Promise<Lif
           onQuestionReject: input.onQuestionReject,
           onCycleVariant: input.onCycleVariant,
           onModelSelect: input.onModelSelect,
+          onVariantSelect: input.onVariantSelect,
           onInterrupt: input.onInterrupt,
           onSubagentSelect: input.onSubagentSelect,
         })

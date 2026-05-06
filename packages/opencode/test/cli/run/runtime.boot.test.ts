@@ -208,14 +208,7 @@ describe("run runtime boot", () => {
       default: {},
       connected: [],
     }
-    spyOn(sdk.config, "providers").mockImplementation(() =>
-      Promise.resolve({
-        data: undefined,
-        error: undefined,
-        request: new Request("https://opencode.test"),
-        response: new Response(),
-      }),
-    )
+    spyOn(sdk.config, "providers").mockRejectedValue(new Error("boom"))
     spyOn(sdk.provider, "list").mockImplementation(() =>
       Promise.resolve({
         data,

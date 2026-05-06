@@ -39,7 +39,7 @@ export const HINT_BREAKPOINTS = {
   send: 50,
   newline: 66,
   history: 80,
-  variant: 95,
+  command: 95,
 }
 
 type Mention = Extract<RunPromptPart, { type: "file" | "agent" }>
@@ -181,7 +181,7 @@ export function hintFlags(width: number) {
     send: width >= HINT_BREAKPOINTS.send,
     newline: width >= HINT_BREAKPOINTS.newline,
     history: width >= HINT_BREAKPOINTS.history,
-    variant: width >= HINT_BREAKPOINTS.variant,
+    command: width >= HINT_BREAKPOINTS.command,
   }
 }
 
@@ -964,7 +964,7 @@ export function createPromptState(input: PromptInput): PromptState {
       return
     }
 
-    if (input.view() === "command" || input.view() === "model") {
+    if (input.view() === "command" || input.view() === "model" || input.view() === "variant") {
       return
     }
 

@@ -113,32 +113,27 @@ function footerKeybinds(config: Config | undefined): FooterKeybinds {
 const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
-    const config = Effect.fn("RunBoot.config")(() =>
-      Effect.tryPromise({
-        try: loadConfig,
-        catch: () => undefined,
-      }),
-    )
+    const config = Effect.fn("RunBoot.config")(() => Effect.promise(() => loadConfig().catch(() => undefined)))
 
     const resolveModelInfo = Effect.fn("RunBoot.resolveModelInfo")(function* (
       sdk: RunInput["sdk"],
       directory: string,
       model: RunInput["model"],
     ) {
-      const connected = yield* Effect.tryPromise({
-        try: () => sdk.config.providers({ directory }),
-        catch: () => undefined,
-      }).pipe(
-        Effect.map((item) => item?.data?.providers),
+      const connected = yield* Effect.promise(() =>
+        sdk.config
+          .providers({ directory })
+          .then((item) => item.data?.providers)
+          .catch(() => undefined),
       )
-      const providers = yield* (connected
-        ? Effect.succeed(connected)
-        : Effect.tryPromise({
-            try: () => sdk.provider.list(),
-            catch: () => undefined,
-          }).pipe(
-            Effect.map((item) => item?.data?.all ?? []),
-          ))
+      const providers = yield* Effect.promise(() =>
+        connected
+          ? Promise.resolve(connected)
+          : sdk.provider
+              .list()
+              .then((item) => item.data?.all ?? [])
+              .catch(() => []),
+      )
       const limits = Object.fromEntries(
         providers.flatMap((provider) =>
           Object.entries(provider.models ?? {}).flatMap(([modelID, info]) => {
@@ -173,10 +168,7 @@ const layer = Layer.effect(
       sessionID: string,
       model: RunInput["model"],
     ) {
-      const session = yield* Effect.tryPromise({
-        try: () => resolveSession(sdk, sessionID),
-        catch: () => undefined,
-      })
+      const session = yield* Effect.promise(() => resolveSession(sdk, sessionID).catch(() => undefined))
       if (!session) {
         return emptySessionInfo()
       }
