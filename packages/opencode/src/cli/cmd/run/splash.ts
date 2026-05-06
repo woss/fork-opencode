@@ -226,7 +226,7 @@ function build(input: SplashWriterInput, kind: "entry" | "exit", ctx: Scrollback
       })
     }
 
-    height = logo.left.length + 1
+    height = logo.left.length
 
     if (input.showSession !== false) {
       const top = logo.left.length + 1
